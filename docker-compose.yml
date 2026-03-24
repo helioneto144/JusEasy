@@ -1,0 +1,12 @@
+services:
+  oracle:
+    build: .
+    container_name: oracle
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1

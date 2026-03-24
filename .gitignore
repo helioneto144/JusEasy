@@ -1,0 +1,28 @@
+# Ambiente e segredos
+.env
+*.key
+*.pem
+*.pub
+ssh-key-*
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Editores
+.idea/
+.vscode/
+*.log
+
+# Internos Claude/Kilo
+.claude/
+.kilo/

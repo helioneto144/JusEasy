@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}Intimações{% endblock %}
+
+{% block content %}
+<div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
+    <div>
+        <h2 class="text-3xl font-bold text-white font-display tracking-tight flex items-center gap-3">
+            <svg class="w-8 h-8 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+            Caixa de Intimações
+        </h2>
+        <p class="text-slate-400 mt-1">Gerencie suas publicações recebidas via AASP</p>
+    </div>
+</div>
+
+<div class="bg-dark-900/40 backdrop-blur-xl rounded-2xl border border-white/5 shadow-2xl overflow-hidden flex flex-col min-h-[500px]">
+    <!-- Filtros -->
+    <div class="p-4 md:p-6 border-b border-white/5 bg-dark-800/30 flex flex-wrap items-center gap-3">
+        <a href="/intimacoes" class="px-5 py-2 rounded-xl text-sm font-medium transition-all duration-300 {{ 'bg-white/10 text-white shadow-[0_4px_12px_rgba(255,255,255,0.05)] border border-white/10' if not filtro_lida else 'bg-dark-800/50 text-slate-400 border border-transparent hover:bg-white/5 hover:text-slate-300' }}">
+            Todas as Intimações
+        </a>
+        <a href="/intimacoes?lida=nao" class="px-5 py-2 rounded-xl text-sm font-medium transition-all duration-300 flex items-center gap-2 {{ 'bg-amber-500/20 text-amber-300 shadow-[0_4px_12px_rgba(245,158,11,0.15)] border border-amber-500/30' if filtro_lida == 'nao' else 'bg-dark-800/50 text-slate-400 border border-transparent hover:bg-white/5 hover:text-amber-400/70' }}">
+            <span class="w-2 h-2 rounded-full {{ 'bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.8)]' if filtro_lida == 'nao' else 'bg-slate-600' }}"></span>
+            Não Lidas
+        </a>
+        <a href="/intimacoes?lida=sim" class="px-5 py-2 rounded-xl text-sm font-medium transition-all duration-300 flex items-center gap-2 {{ 'bg-emerald-500/20 text-emerald-300 shadow-[0_4px_12px_rgba(16,185,129,0.15)] border border-emerald-500/30' if filtro_lida == 'sim' else 'bg-dark-800/50 text-slate-400 border border-transparent hover:bg-white/5 hover:text-emerald-400/70' }}">
+            <svg class="w-3.5 h-3.5 {{ 'text-emerald-400' if filtro_lida == 'sim' else 'text-slate-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+            Arquivadas (Lidas)
+        </a>
+    </div>
+    
+    <!-- Lista -->
+    <div class="divide-y divide-white/5 flex-1 relative">
+        {% for intimacao in intimacoes %}
+        <div class="p-6 transition-all duration-300 {{ 'bg-amber-500/[0.02] hover:bg-amber-500/[0.04]' if not intimacao.lida else 'hover:bg-white/[0.02]' }} group" x-data="{ open: false }">
+            <div class="flex items-start gap-4">
+                <!-- Status indicator -->
+                <div class="mt-1.5 flex-shrink-0">
+                    {% if not intimacao.lida %}
+                    <span class="flex w-3 h-3 bg-amber-500 rounded-full shadow-[0_0_12px_rgba(245,158,11,0.8)]"></span>
+                    {% else %}
+                    <span class="flex w-3 h-3 bg-slate-700/50 border border-slate-600/50 rounded-full"></span>
+                    {% endif %}
+                </div>
+                
+                <div class="flex-1 min-w-0">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                        <div class="flex flex-wrap items-center gap-3">
+                            <span class="text-xs font-semibold tracking-widest uppercase {{ 'text-amber-400' if not intimacao.lida else 'text-slate-500' }}">
+                                {{ intimacao.data_disponibilizacao }}
+                            </span>
+                            
+                            {% if intimacao.diario_oficial %}
+                            <span class="text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 bg-white/5 text-slate-400 border border-white/10 rounded">
+                                {{ intimacao.diario_oficial }}
+                            </span>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="flex items-center gap-3">
+                            {% if intimacao.processo_id %}
+                            <a href="/processo/{{ intimacao.processo_id }}" class="inline-flex items-center gap-1.5 text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20 px-3 py-1.5 rounded-lg hover:bg-blue-500/20 transition-all z-10 relative shadow-[0_2px_8px_rgba(59,130,246,0.15)]">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                                Acessar Processo
+                            </a>
+                            {% endif %}
+                            
+                            {% if not intimacao.lida %}
+                            <button hx-post="/intimacao/{{ intimacao.id }}/ler" 
+                                    hx-swap="none"
+                                    class="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider px-3 py-1.5 bg-amber-500/10 text-amber-400 rounded-lg border border-amber-500/20 hover:bg-amber-500/20 transition-all z-10 relative shadow-[0_2px_8px_rgba(245,158,11,0.15)]"
+                                    title="Arquivar intimação">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                Marcar como Lida
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="relative cursor-ns-resize group/text" @click="open = !open">
+                        <p class="text-[15px] leading-relaxed transition-all {{ 'text-white font-medium' if not intimacao.lida else 'text-slate-300' }}"
+                           :class="open ? '' : 'line-clamp-3'">
+                            {{ intimacao.conteudo }}
+                        </p>
+                        
+                        <!-- Ver mais gradiente (shown only when collapsed and text is long) -->
+                        <div x-show="!open" class="absolute bottom-0 inset-x-0 h-12 bg-gradient-to-t {{ 'from-[#1a1711] sm:from-[#13110e]' if not intimacao.lida else 'from-dark-900/40' }} to-transparent flex items-end justify-center pointer-events-none opacity-0 group-hover/text:opacity-100 transition-opacity">
+                            <span class="text-xs font-medium text-slate-400 mb-1">Clique para expandir</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="absolute inset-0 flex flex-col items-center justify-center p-12 text-center text-slate-500">
+            <div class="w-20 h-20 bg-dark-800 rounded-full flex items-center justify-center mb-6 shadow-inner border border-white/5">
+                <svg class="w-10 h-10 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2-2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
+            </div>
+            <h3 class="text-xl font-display font-semibold text-slate-400 mb-2">Caixa Vazia</h3>
+            <p>Nenhuma intimação corresponde aos filtros atuais.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

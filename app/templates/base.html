@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}JusEasy{% endblock %} - Gestão de Processos</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Outfit', 'sans-serif'],
+                    },
+                    colors: {
+                        dark: {
+                            950: '#070A11',
+                            900: '#0B0F19',
+                            800: '#131B2C',
+                            700: '#1C273D',
+                            600: '#2A3A54',
+                            500: '#3D5276',
+                        },
+                        accent: {
+                            500: '#3B82F6',
+                            600: '#2563EB',
+                            glow: 'rgba(59, 130, 246, 0.5)'
+                        }
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.3s ease-out forwards',
+                        'fade-in-up': 'fadeInUp 0.4s ease-out forwards',
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        fadeInUp: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .htmx-request .htmx-indicator { display: inline-block; }
+        .htmx-request .htmx-hide { display: none; }
+        .htmx-indicator { display: none; }
+        
+        body { font-family: 'Inter', sans-serif; }
+        h1, h2, h3, h4, h5, h6, .font-display { font-family: 'Outfit', sans-serif; }
+        
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #1C273D; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #2A3A54; }
+        
+        /* Focus styles glow */
+        textarea:focus, input:focus, select:focus { 
+            outline: none; 
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4), 0 0 15px rgba(59, 130, 246, 0.15); 
+            border-color: #3B82F6;
+        }
+        
+        /* Soft transition for all elements */
+        a, button, input { transition: all 0.2s ease-in-out; }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body class="bg-dark-950 text-slate-300 min-h-screen selection:bg-accent-500/30 selection:text-white">
+    <!-- Ambient glowing light effect behind the app -->
+    <div class="fixed top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-accent-600/10 blur-[120px] pointer-events-none"></div>
+    <div class="fixed bottom-[-10%] right-[-10%] w-[30%] h-[30%] rounded-full bg-purple-600/10 blur-[100px] pointer-events-none"></div>
+
+    <div class="flex h-screen overflow-hidden relative z-10">
+        <!-- Sidebar with Glassmorphism -->
+        <aside class="w-64 bg-dark-900/80 backdrop-blur-xl border-r border-white/5 flex flex-col shadow-[4px_0_24px_rgba(0,0,0,0.2)] z-20">
+            <div class="p-6 border-b border-white/5 flex items-center justify-between">
+                <h1 class="text-2xl font-bold font-display text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400 flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                        </svg>
+                    </div>
+                    JusEasy
+                </h1>
+            </div>
+            
+            <nav class="flex-1 p-4 overflow-y-auto">
+                <ul class="space-y-2">
+                    <li>
+                        <a href="/" class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all group {% if request.url.path == '/' %}bg-white/10 text-white shadow-[0_0_15px_rgba(255,255,255,0.05)] border border-white/10{% else %}text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent{% endif %}">
+                            <svg class="w-5 h-5 {% if request.url.path == '/' %}text-blue-400{% else %}text-slate-500 group-hover:text-blue-400{% endif %} transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+                            <span class="font-medium">Dashboard</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/processos" class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all group {% if 'processos' in request.url.path %}bg-white/10 text-white shadow-[0_0_15px_rgba(255,255,255,0.05)] border border-white/10{% else %}text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent{% endif %}">
+                            <svg class="w-5 h-5 {% if 'processos' in request.url.path %}text-blue-400{% else %}text-slate-500 group-hover:text-blue-400{% endif %} transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
+                            <span class="font-medium">Processos</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/intimacoes" class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all group {% if 'intimacoes' in request.url.path %}bg-white/10 text-white shadow-[0_0_15px_rgba(255,255,255,0.05)] border border-white/10{% else %}text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent{% endif %}">
+                            <svg class="w-5 h-5 {% if 'intimacoes' in request.url.path %}text-amber-400{% else %}text-slate-500 group-hover:text-amber-400{% endif %} transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                            <span class="font-medium">Intimações</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/tarefas" class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all group {% if 'tarefas' in request.url.path %}bg-white/10 text-white shadow-[0_0_15px_rgba(255,255,255,0.05)] border border-white/10{% else %}text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent{% endif %}">
+                            <svg class="w-5 h-5 {% if 'tarefas' in request.url.path %}text-green-400{% else %}text-slate-500 group-hover:text-green-400{% endif %} transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                            <span class="font-medium">Tarefas</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            
+            <div class="p-4 border-t border-white/5 bg-dark-900/50">
+                <button hx-post="/sync-intimacoes" hx-swap="none" class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 rounded-xl text-white font-medium shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transform hover:-translate-y-0.5 transition-all">
+                    <svg class="w-4 h-4 animate-[spin_4s_linear_infinite] htmx-indicator" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    <svg class="w-4 h-4 htmx-hide" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    Sincronizar AASP
+                </button>
+            </div>
+        </aside>
+        
+        <!-- Main Content -->
+        <main class="flex-1 overflow-y-auto w-full relative">
+            <div class="p-8 max-w-7xl mx-auto h-full flex flex-col animate-fade-in-up">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+    
+    <!-- Global Toast -->
+    <div id="toast" class="fixed bottom-6 right-6 hidden z-50 animate-fade-in-up">
+        <div class="bg-dark-800/90 backdrop-blur-md border border-white/10 text-white px-5 py-3 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.5)] flex items-center gap-3">
+            <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+            <span class="font-medium text-sm"></span>
+        </div>
+    </div>
+    
+<script>
+        function downloadYaml() {
+            var codeEl = document.getElementById('yaml-code');
+            if (!codeEl) return;
+            var content = codeEl.innerText;
+            var blob = new Blob([content], { type: 'text/yaml' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'processo.yml';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        
+        document.body.addEventListener('htmx:afterRequest', function(evt) {
+            if (evt.detail.successful) {
+                var toast = document.getElementById('toast');
+                var msg = evt.detail.xhr.getResponseHeader('X-Toast');
+                if (msg) {
+                    toast.querySelector('span').textContent = msg;
+                    toast.classList.remove('hidden');
+                    toast.classList.add('animate-fade-in-up');
+                    setTimeout(function() {
+                        toast.classList.remove('animate-fade-in-up');
+                        toast.classList.add('hidden');
+                    }, 4000);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
