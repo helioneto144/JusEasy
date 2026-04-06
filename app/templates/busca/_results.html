@@ -1,0 +1,52 @@
+{% if not q or (not resultados.processos and not resultados.intimacoes and not resultados.tarefas) %}
+<div class="p-6 text-center text-slate-500 text-sm">
+    {% if q %}Nenhum resultado para "{{ q }}"{% else %}Digite para buscar...{% endif %}
+</div>
+{% else %}
+
+{% if resultados.processos %}
+<div class="p-3">
+    <p class="text-[10px] font-bold uppercase tracking-widest text-blue-400 px-3 mb-2">Processos</p>
+    {% for p in resultados.processos %}
+    <a href="/processo/{{ p.id }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 group">
+        <svg class="w-4 h-4 text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
+        <div class="min-w-0">
+            <p class="text-sm text-white font-mono truncate">{{ p.numero }}</p>
+            <p class="text-xs text-slate-500 truncate">{{ p.assunto or p.comarca or '' }}</p>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if resultados.intimacoes %}
+<div class="p-3 border-t border-white/5">
+    <p class="text-[10px] font-bold uppercase tracking-widest text-amber-400 px-3 mb-2">Intimacoes</p>
+    {% for i in resultados.intimacoes %}
+    <a href="{% if i.processo_id %}/processo/{{ i.processo_id }}{% else %}/intimacoes{% endif %}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 group">
+        <svg class="w-4 h-4 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+        <div class="min-w-0">
+            <p class="text-sm text-slate-300 line-clamp-1">{{ i.conteudo[:100] }}</p>
+            <p class="text-xs text-slate-500">{{ i.data_disponibilizacao }}</p>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if resultados.tarefas %}
+<div class="p-3 border-t border-white/5">
+    <p class="text-[10px] font-bold uppercase tracking-widest text-green-400 px-3 mb-2">Tarefas</p>
+    {% for t in resultados.tarefas %}
+    <a href="/tarefas" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 group">
+        <svg class="w-4 h-4 text-green-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+        <div class="min-w-0">
+            <p class="text-sm text-white truncate">{{ t.titulo }}</p>
+            <p class="text-xs text-slate-500">{{ t.data_vencimento }} &middot; {{ t.prioridade }}</p>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% endif %}

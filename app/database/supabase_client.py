@@ -103,6 +103,25 @@ async def get_tarefas_urgentes():
     return response.data
 
 
+async def update_processo_status(id: str, status: str):
+    supabase.table("processos").update({"status": status}).eq("id", id).execute()
+
+
+async def get_notas_by_processo(processo_id: str):
+    response = supabase.table("notas").select("*").eq("processo_id", processo_id).order("created_at", desc=True).execute()
+    return response.data
+
+
+async def create_nota(processo_id: str, conteudo: str):
+    data = {"processo_id": processo_id, "conteudo": conteudo}
+    response = supabase.table("notas").insert(data).execute()
+    return response.data[0] if response.data else None
+
+
+async def delete_nota(nota_id: str):
+    supabase.table("notas").delete().eq("id", nota_id).execute()
+
+
 async def get_stats():
     # Isso é devagar se o banco for gigante, mas serve pro Oracle v1
     proc = supabase.table("processos").select("id", count="exact").execute()

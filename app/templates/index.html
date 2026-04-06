@@ -18,9 +18,9 @@
     </div>
 </div>
 
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10 stagger">
     <!-- Processos Card -->
-    <div class="bg-dark-900/40 backdrop-blur-xl rounded-2xl p-6 border border-white/5 shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:-translate-y-1 hover:shadow-[0_8px_30px_rgba(59,130,246,0.15)] transition-all duration-300 group relative overflow-hidden">
+    <div class="bg-dark-900/40 backdrop-blur-xl rounded-2xl p-6 border border-white/5 shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover-lift hover:shadow-[0_8px_30px_rgba(59,130,246,0.15)] group relative overflow-hidden">
         <div class="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl group-hover:bg-blue-500/20 transition-all duration-300"></div>
         <div class="flex items-start justify-between relative z-10">
             <div>
@@ -34,7 +34,7 @@
     </div>
     
     <!-- Intimações Card -->
-    <div class="bg-dark-900/40 backdrop-blur-xl rounded-2xl p-6 border border-white/5 shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:-translate-y-1 hover:shadow-[0_8px_30px_rgba(245,158,11,0.15)] transition-all duration-300 group relative overflow-hidden">
+    <div class="bg-dark-900/40 backdrop-blur-xl rounded-2xl p-6 border border-white/5 shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover-lift hover:shadow-[0_8px_30px_rgba(245,158,11,0.15)] group relative overflow-hidden">
         <div class="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-amber-500/10 rounded-full blur-2xl group-hover:bg-amber-500/20 transition-all duration-300"></div>
         <div class="flex items-start justify-between relative z-10">
             <div>
@@ -53,7 +53,7 @@
     </div>
     
     <!-- Tarefas Card -->
-    <div class="bg-dark-900/40 backdrop-blur-xl rounded-2xl p-6 border border-white/5 shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:-translate-y-1 hover:shadow-[0_8px_30px_rgba(16,185,129,0.15)] transition-all duration-300 group relative overflow-hidden">
+    <div class="bg-dark-900/40 backdrop-blur-xl rounded-2xl p-6 border border-white/5 shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover-lift hover:shadow-[0_8px_30px_rgba(16,185,129,0.15)] group relative overflow-hidden">
         <div class="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-green-500/10 rounded-full blur-2xl group-hover:bg-green-500/20 transition-all duration-300"></div>
         <div class="flex items-start justify-between relative z-10">
             <div>
@@ -67,7 +67,7 @@
     </div>
     
     <!-- Acesso Rápido Card -->
-    <div class="bg-dark-900/40 backdrop-blur-xl rounded-2xl p-6 border border-white/5 shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:-translate-y-1 hover:shadow-[0_8px_30px_rgba(168,85,247,0.15)] transition-all duration-300 group relative overflow-hidden">
+    <div class="bg-dark-900/40 backdrop-blur-xl rounded-2xl p-6 border border-white/5 shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover-lift hover:shadow-[0_8px_30px_rgba(168,85,247,0.15)] group relative overflow-hidden">
         <div class="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-purple-500/10 rounded-full blur-2xl group-hover:bg-purple-500/20 transition-all duration-300"></div>
         <div class="flex items-start justify-between relative z-10">
             <div>
@@ -96,7 +96,7 @@
                 <svg class="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
             </a>
         </div>
-        <div class="divide-y divide-white/5 flex-1 p-2">
+        <div class="divide-y divide-white/5 flex-1 p-2 stagger">
             {% for intimacao in ultimas_intimacoes %}
             <div class="p-4 rounded-xl hover:bg-white/5 transition-colors group cursor-pointer relative">
                 <div class="flex items-start gap-4">
@@ -133,55 +133,100 @@
         </div>
     </div>
     
-    <!-- Ações Rápidas -->
-    <div class="bg-dark-900/40 backdrop-blur-xl rounded-2xl border border-white/5 shadow-2xl overflow-hidden flex flex-col">
-        <div class="p-5 border-b border-white/5 bg-dark-800/20">
-            <h3 class="font-semibold text-white font-display flex items-center gap-2">
-                <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                Ações Rápidas
-            </h3>
-        </div>
-        <div class="p-4 space-y-3 flex-1">
-            <a href="/processo/novo" class="group flex items-center gap-4 p-4 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-blue-500/10 hover:border-blue-500/30 transition-all duration-300">
-                <div class="w-10 h-10 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center group-hover:scale-110 transition-transform shadow-[0_0_10px_rgba(59,130,246,0.3)]">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                </div>
-                <div>
-                    <p class="font-medium text-white group-hover:text-blue-300 transition-colors">Cadastrar Processo</p>
-                    <p class="text-xs text-slate-500 mt-0.5">Adicionar novo caso ao sistema</p>
-                </div>
-            </a>
-            
-            <a href="/intimacoes?lida=nao" class="group flex items-center gap-4 p-4 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-amber-500/10 hover:border-amber-500/30 transition-all duration-300">
-                <div class="w-10 h-10 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center group-hover:scale-110 transition-transform shadow-[0_0_10px_rgba(245,158,11,0.3)]">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
-                </div>
-                <div>
-                    <p class="font-medium text-white group-hover:text-amber-300 transition-colors">Caixa de Entrada</p>
-                    <p class="text-xs text-slate-500 mt-0.5">Visualizar intimações abertas</p>
-                </div>
-            </a>
-            
-            <a href="/tarefas" class="group flex items-center gap-4 p-4 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-green-500/10 hover:border-green-500/30 transition-all duration-300">
-                <div class="w-10 h-10 rounded-lg bg-green-500/20 text-green-400 flex items-center justify-center group-hover:scale-110 transition-transform shadow-[0_0_10px_rgba(16,185,129,0.3)]">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
-                </div>
-                <div>
-                    <p class="font-medium text-white group-hover:text-green-300 transition-colors">Quadro de Tarefas</p>
-                    <p class="text-xs text-slate-500 mt-0.5">Gerenciar prazos e atividades</p>
-                </div>
-            </a>
-            
-            <div class="mt-6 pt-6 border-t border-white/5">
-                <div class="bg-gradient-to-br from-indigo-500/10 to-purple-500/10 rounded-xl p-4 border border-indigo-500/20">
-                    <div class="flex items-center gap-2 mb-2">
-                        <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                        <span class="text-sm font-semibold text-purple-200">Dica do Sistema</span>
+    <!-- Painel Direito: Calendário + Prazos + Ações -->
+    <div class="space-y-6">
+        <!-- Mini-Calendário Semanal -->
+        <div class="bg-dark-900/40 backdrop-blur-xl rounded-2xl border border-white/5 shadow-2xl overflow-hidden">
+            <div class="p-5 border-b border-white/5 bg-dark-800/20">
+                <h3 class="font-semibold text-white font-display flex items-center gap-2">
+                    <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    Esta Semana
+                </h3>
+            </div>
+            <div class="p-4">
+                <div class="grid grid-cols-7 gap-1">
+                    {% for dia in calendario %}
+                    {% set info = tarefas_por_dia.get(dia.iso, {}) %}
+                    <div class="flex flex-col items-center py-2 rounded-lg {{ 'bg-blue-500/20 border border-blue-500/30' if dia.hoje else 'hover:bg-white/5' }}">
+                        <span class="text-[10px] font-semibold uppercase {{ 'text-blue-300' if dia.hoje else 'text-slate-500' }}">{{ dia.nome }}</span>
+                        <span class="text-lg font-bold {{ 'text-white' if dia.hoje else 'text-slate-300' }} mt-0.5">{{ dia.dia }}</span>
+                        {% if info.get('count', 0) > 0 %}
+                        <div class="flex items-center gap-0.5 mt-1">
+                            <span class="w-1.5 h-1.5 rounded-full {{ 'bg-red-500' if info.get('urgente') else 'bg-blue-500' }}"></span>
+                            {% if info['count'] > 1 %}<span class="text-[9px] text-slate-400">{{ info['count'] }}</span>{% endif %}
+                        </div>
+                        {% else %}
+                        <div class="h-3 mt-1"></div>
+                        {% endif %}
                     </div>
-                    <p class="text-xs text-indigo-200/70 leading-relaxed">
-                        Exporte um processo para formato YAML e utilize uma inteligência artificial para resumir todo o seu andamento com um único comando.
-                    </p>
+                    {% endfor %}
                 </div>
+            </div>
+        </div>
+
+        <!-- Próximos Prazos -->
+        {% if proximos_prazos %}
+        <div class="bg-dark-900/40 backdrop-blur-xl rounded-2xl border border-white/5 shadow-2xl overflow-hidden">
+            <div class="p-5 border-b border-white/5 bg-dark-800/20">
+                <h3 class="font-semibold text-white font-display flex items-center gap-2">
+                    <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Prazos da Semana
+                </h3>
+            </div>
+            <div class="p-3 space-y-1 stagger">
+                {% for prazo in proximos_prazos %}
+                {% set dias_rest = (prazo.data_vencimento | string)[:10] %}
+                <div class="flex items-center gap-3 p-3 rounded-lg hover:bg-white/5 group">
+                    {% if prazo.prioridade == 'urgente' %}
+                    <span class="w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)] shrink-0"></span>
+                    {% elif prazo.prioridade == 'alta' %}
+                    <span class="w-2.5 h-2.5 rounded-full bg-orange-500 shrink-0"></span>
+                    {% else %}
+                    <span class="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0"></span>
+                    {% endif %}
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm text-white font-medium truncate">{{ prazo.titulo }}</p>
+                        <p class="text-xs text-slate-500">{{ prazo.data_vencimento }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Ações Rápidas -->
+        <div class="bg-dark-900/40 backdrop-blur-xl rounded-2xl border border-white/5 shadow-2xl overflow-hidden">
+            <div class="p-5 border-b border-white/5 bg-dark-800/20">
+                <h3 class="font-semibold text-white font-display flex items-center gap-2">
+                    <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    Ações Rápidas
+                </h3>
+            </div>
+            <div class="p-4 space-y-3 stagger">
+                <a href="/processo/novo" class="group flex items-center gap-4 p-3 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-blue-500/10 hover:border-blue-500/30">
+                    <div class="w-9 h-9 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center shadow-[0_0_10px_rgba(59,130,246,0.3)]">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    </div>
+                    <div>
+                        <p class="font-medium text-sm text-white group-hover:text-blue-300">Cadastrar Processo</p>
+                    </div>
+                </a>
+                <a href="/intimacoes?lida=nao" class="group flex items-center gap-4 p-3 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-amber-500/10 hover:border-amber-500/30">
+                    <div class="w-9 h-9 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center shadow-[0_0_10px_rgba(245,158,11,0.3)]">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                    </div>
+                    <div>
+                        <p class="font-medium text-sm text-white group-hover:text-amber-300">Caixa de Entrada</p>
+                    </div>
+                </a>
+                <a href="/tarefas" class="group flex items-center gap-4 p-3 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-green-500/10 hover:border-green-500/30">
+                    <div class="w-9 h-9 rounded-lg bg-green-500/20 text-green-400 flex items-center justify-center shadow-[0_0_10px_rgba(16,185,129,0.3)]">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                    </div>
+                    <div>
+                        <p class="font-medium text-sm text-white group-hover:text-green-300">Quadro de Tarefas</p>
+                    </div>
+                </a>
             </div>
         </div>
     </div>

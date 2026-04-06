@@ -3,8 +3,10 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 from datetime import date, timedelta, datetime
 from app.database.supabase_client import (
+    supabase,
     get_processos,
     get_processo_by_numero,
+    get_processo_by_id,
     get_intimacoes_nao_lidas,
     get_intimacoes_by_processo,
     get_tarefas_pendentes,
@@ -18,6 +20,8 @@ from app.database.supabase_client import (
     get_tarefas_urgentes,
     archive_processo,
     delete_tarefa,
+    create_nota,
+    get_notas_by_processo,
 )
 from app.services.yaml_export import export_processo_yaml
 from app.services.ai_service import ask_ai
@@ -72,8 +76,12 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "⚠️ /prazos — Prazos agrupados por urgência\n"
         "📅 /hoje — Tarefas de hoje\n"
         "📅 /semana — Tarefas da semana\n"
+        "📅 /calendario — Visão semanal\n"
         "➕ /tarefa — Criar nova tarefa\n"
+        "📝 /nota — Anotar em processo\n"
+        "🔍 /busca — Buscar em tudo\n"
         "📊 /status — Resumo do sistema\n"
+        "📊 /stats — Estatísticas detalhadas\n"
         "📋 /resumo — Resumo diário agora\n"
         "🤖 /ia — Consultar IA jurídica\n"
         "📄 /yaml — Exportar processo para IA\n"
@@ -117,7 +125,10 @@ async def cmd_intimacoes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"📋 <b>{len(intimacoes)} Intimação(ões) Não Lida(s)</b>\n"
         "Cada item abaixo pode ser marcado como lido:",
-        parse_mode="HTML"
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("✅ Marcar Todas como Lidas", callback_data="marcar_todas_lidas")]
+        ])
     )
 
     for i, intim in enumerate(intimacoes, 1):
@@ -789,6 +800,19 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="HTML"
         )
 
+    # ── Marcar todas intimações como lidas ──
+    elif data == "marcar_todas_lidas":
+        nao_lidas = await get_intimacoes_nao_lidas(limit=100)
+        count = 0
+        for intim in nao_lidas:
+            await marcar_intimacao_lida(intim["id"])
+            count += 1
+        await query.edit_message_text(
+            f"✅ <b>{count} intimação(ões) marcada(s) como lida(s).</b>",
+            parse_mode="HTML",
+            reply_markup=kb_voltar()
+        )
+
 
 # ─────────────────────────────────────────────
 # /resumo — disparo manual do resumo diário
@@ -799,6 +823,192 @@ async def cmd_resumo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from app.scheduler.jobs import resumo_diario
     await update.message.reply_text("⏳ Gerando resumo…", parse_mode="HTML")
     await resumo_diario(force=True)
+
+
+# ─────────────────────────────────────────────
+# /calendario — visão semanal
+# ─────────────────────────────────────────────
+
+async def cmd_calendario(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"[/calendario] user={update.effective_user.id}")
+    hoje = date.today()
+    dias_semana = ["SEG", "TER", "QUA", "QUI", "SEX", "SAB", "DOM"]
+    inicio = hoje
+    fim = hoje + timedelta(days=6)
+
+    tarefas = await get_tarefas_por_data(inicio, fim)
+    intimacoes_raw = supabase.table("intimacoes").select("*").gte(
+        "data_disponibilizacao", str(inicio)
+    ).lte("data_disponibilizacao", str(fim)).execute()
+    intimacoes = intimacoes_raw.data or []
+
+    text = f"📅 <b>Semana {inicio.strftime('%d/%m')} — {fim.strftime('%d/%m')}</b>\n\n"
+
+    for i in range(7):
+        dia = inicio + timedelta(days=i)
+        dia_str = str(dia)
+        dia_nome = dias_semana[dia.weekday()]
+        dia_fmt = dia.strftime("%d")
+        marcador = " 👈" if dia == hoje else ""
+
+        tarefas_dia = [t for t in tarefas if str(t.get("data_vencimento", ""))[:10] == dia_str]
+        intims_dia = [i for i in intimacoes if str(i.get("data_disponibilizacao", ""))[:10] == dia_str]
+
+        if not tarefas_dia and not intims_dia:
+            text += f"<b>{dia_nome} {dia_fmt}</b>{marcador} ───\n  <i>(vazio)</i>\n\n"
+        else:
+            text += f"<b>{dia_nome} {dia_fmt}</b>{marcador} ───\n"
+            for t in tarefas_dia:
+                emoji_p = PRIORIDADE_EMOJI.get(t.get("prioridade", "media"), "⚪")
+                text += f"  {emoji_p} {t.get('titulo', '')}\n"
+            for intim in intims_dia:
+                text += f"  📋 Intimação: {(intim.get('conteudo') or '')[:60]}…\n"
+            text += "\n"
+
+    await update.message.reply_text(text[:4000], parse_mode="HTML", reply_markup=kb_voltar())
+
+
+# ─────────────────────────────────────────────
+# /nota <numero> <texto>
+# ─────────────────────────────────────────────
+
+async def cmd_nota(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args or len(context.args) < 2:
+        await update.message.reply_text(
+            "📝 <b>Adicionar Nota a Processo</b>\n\n"
+            "Uso: <code>/nota NUMERO_PROCESSO Texto da anotação</code>\n\n"
+            "Exemplo:\n<code>/nota 1234567-89.2024.8.26.0002 Cliente ligou pedindo atualização</code>",
+            parse_mode="HTML"
+        )
+        return
+
+    numero = context.args[0]
+    texto = " ".join(context.args[1:])
+    processo = await get_processo_by_numero(numero)
+
+    if not processo:
+        await update.message.reply_text(
+            f"❌ Processo <code>{numero}</code> não encontrado.",
+            parse_mode="HTML"
+        )
+        return
+
+    proc_id = processo.get("id")
+    await create_nota(proc_id, texto)
+
+    await update.message.reply_text(
+        f"📝 <b>Nota adicionada!</b>\n\n"
+        f"Processo: <code>{numero}</code>\n"
+        f"Nota: {texto[:200]}",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("📁 Ver Processo", callback_data=f"ver_processo:{numero}")],
+            [InlineKeyboardButton("🔙 Menu Principal", callback_data="menu:start")]
+        ])
+    )
+
+
+# ─────────────────────────────────────────────
+# /busca <termo>
+# ─────────────────────────────────────────────
+
+async def cmd_busca(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text(
+            "🔍 <b>Busca Global</b>\n\nUso: <code>/busca TERMO</code>\n"
+            "Busca em processos, intimações e tarefas.",
+            parse_mode="HTML"
+        )
+        return
+
+    termo = " ".join(context.args)
+    q_safe = termo.replace("%", "").replace("'", "").replace(";", "")
+    logger.info(f"[/busca] termo={q_safe[:50]}")
+
+    procs = supabase.table("processos").select("numero,assunto,comarca").or_(
+        f"numero.ilike.%{q_safe}%,assunto.ilike.%{q_safe}%,comarca.ilike.%{q_safe}%"
+    ).limit(5).execute()
+    intims = supabase.table("intimacoes").select("id,conteudo,data_disponibilizacao").ilike(
+        "conteudo", f"%{q_safe}%"
+    ).limit(5).execute()
+    tars = supabase.table("tarefas").select("id,titulo,data_vencimento,prioridade").ilike(
+        "titulo", f"%{q_safe}%"
+    ).limit(5).execute()
+
+    text = f"🔍 <b>Resultados para \"{termo}\"</b>\n\n"
+    found = False
+
+    if procs.data:
+        found = True
+        text += "<b>📁 Processos:</b>\n"
+        for p in procs.data:
+            text += f"  • <code>{p.get('numero', '')}</code> — {(p.get('assunto') or p.get('comarca') or '')[:40]}\n"
+        text += "\n"
+
+    if intims.data:
+        found = True
+        text += "<b>📋 Intimações:</b>\n"
+        for i in intims.data:
+            text += f"  • {fmt_data(i.get('data_disponibilizacao', ''))} — {(i.get('conteudo') or '')[:60]}…\n"
+        text += "\n"
+
+    if tars.data:
+        found = True
+        text += "<b>📝 Tarefas:</b>\n"
+        for t in tars.data:
+            emoji = PRIORIDADE_EMOJI.get(t.get("prioridade", "media"), "⚪")
+            text += f"  {emoji} {t.get('titulo', '')} — {fmt_data(t.get('data_vencimento', ''))}\n"
+        text += "\n"
+
+    if not found:
+        text += "Nenhum resultado encontrado."
+
+    await update.message.reply_text(text[:4000], parse_mode="HTML", reply_markup=kb_voltar())
+
+
+# ─────────────────────────────────────────────
+# /stats — estatísticas detalhadas
+# ─────────────────────────────────────────────
+
+async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"[/stats] user={update.effective_user.id}")
+    stats = await get_stats()
+
+    # Processos arquivados
+    arq = supabase.table("processos").select("id", count="exact").eq("arquivado", True).execute()
+    arq_count = arq.count or 0
+
+    # Total intimações
+    total_intim = supabase.table("intimacoes").select("id", count="exact").execute()
+    total_intim_count = total_intim.count or 0
+
+    # Tarefas concluídas esta semana
+    hoje = date.today()
+    inicio_semana = hoje - timedelta(days=hoje.weekday())
+    concluidas = supabase.table("tarefas").select("id", count="exact").eq(
+        "concluida", True
+    ).gte("data_vencimento", str(inicio_semana)).execute()
+    concluidas_count = concluidas.count or 0
+
+    # Próximo prazo
+    prox = supabase.table("tarefas").select("titulo,data_vencimento").eq(
+        "concluida", False
+    ).gte("data_vencimento", str(hoje)).order("data_vencimento").limit(1).execute()
+    prox_prazo = prox.data[0] if prox.data else None
+
+    text = (
+        "📊 <b>Estatísticas JusEasy</b>\n\n"
+        f"📁 Processos: <b>{stats['processos']}</b> ativos / <b>{arq_count}</b> arquivados\n"
+        f"📋 Intimações: <b>{stats['intimacoes_nao_lidas']}</b> não lidas / <b>{total_intim_count}</b> total\n"
+        f"📝 Tarefas: <b>{stats['tarefas_pendentes']}</b> pendentes / <b>{stats['tarefas_urgentes']}</b> urgentes\n"
+        f"✅ Concluídas esta semana: <b>{concluidas_count}</b>\n"
+    )
+
+    if prox_prazo:
+        dias_rest = (date.fromisoformat(str(prox_prazo["data_vencimento"])[:10]) - hoje).days
+        text += f"\n⚠️ Próximo prazo: <b>{prox_prazo['titulo']}</b> ({dias_rest} dia{'s' if dias_rest != 1 else ''})"
+
+    await update.message.reply_text(text, parse_mode="HTML", reply_markup=kb_voltar())
 
 
 # ─────────────────────────────────────────────
@@ -819,4 +1029,8 @@ def setup_handlers(app):
     app.add_handler(CommandHandler("tarefa", cmd_tarefa_create))
     app.add_handler(CommandHandler("yaml", cmd_yaml))
     app.add_handler(CommandHandler("ia", cmd_ia))
+    app.add_handler(CommandHandler("calendario", cmd_calendario))
+    app.add_handler(CommandHandler("nota", cmd_nota))
+    app.add_handler(CommandHandler("busca", cmd_busca))
+    app.add_handler(CommandHandler("stats", cmd_stats))
     app.add_handler(CallbackQueryHandler(callback_handler))
