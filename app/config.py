@@ -29,6 +29,13 @@ class Settings(BaseSettings):
     groq_base_url: str = "https://api.groq.com/openai/v1"
     groq_model: str = "llama-3.3-70b-versatile"
 
+    # Webhook (Cloudflare Email Worker → JusEasy)
+    webhook_secret: str = ""
+
+    # Feature flags — captura de intimações
+    aasp_enabled: bool = True       # legacy, será desligado quando OAB-ES funcionar
+    oab_es_enabled: bool = False    # processamento via email da OAB-ES
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

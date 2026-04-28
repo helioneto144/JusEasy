@@ -9,7 +9,7 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 from app.config import get_settings
 from app.bot.bot import bot
-from app.routes import web
+from app.routes import web, webhook
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -59,6 +59,9 @@ async def lifespan(app: FastAPI):
 
 
 def run_check_intimacoes():
+    if not settings.aasp_enabled:
+        logger.info("Job: check_intimacoes pulado (aasp_enabled=false)")
+        return
     from app.scheduler.jobs import check_intimacoes
     logger.info("Job: check_intimacoes iniciado")
     if not event_loop:
@@ -109,6 +112,7 @@ templates = Jinja2Templates(directory="app/templates")
 app.state.templates = templates
 
 app.include_router(web.router)
+app.include_router(webhook.router)
 
 
 @app.get("/api")
