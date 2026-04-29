@@ -29,6 +29,19 @@ class Settings(BaseSettings):
     groq_base_url: str = "https://api.groq.com/openai/v1"
     groq_model: str = "llama-3.3-70b-versatile"
 
+    # Webhook (alternativa via Cloudflare Email Worker — opcional)
+    webhook_secret: str = ""
+
+    # Gmail IMAP (captura de intimações via email)
+    gmail_user: str = ""                          # ex: heliomenezesneto@gmail.com
+    gmail_app_password: str = ""                  # App Password do Gmail (16 chars sem espaços)
+    gmail_imap_host: str = "imap.gmail.com"
+    gmail_imap_label: str = "OAB-ES"              # label que o filtro Gmail aplica
+
+    # Feature flags — captura de intimações
+    aasp_enabled: bool = True       # legacy, será desligado quando OAB-ES funcionar
+    oab_es_enabled: bool = False    # processamento via email da OAB-ES
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

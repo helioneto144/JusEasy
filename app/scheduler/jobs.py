@@ -281,3 +281,227 @@ async def resumo_diario(force: bool = False):
             text += f"Existem {urgentes} prazos extremamente urgentes (/prazos).\n"
 
     await bot.send_message(text, parse_mode="HTML")
+
+
+# ─────────────────────────────────────────────
+# Gmail IMAP — captura de emails OAB-ES
+# ─────────────────────────────────────────────
+
+# Subjects "Public. 0." = zero publicacoes — nao processar.
+_SUBJECT_ZERO_PUB = re.compile(r'\bPublic\.\s*0\.', re.IGNORECASE)
+
+
+def _has_publications(subject: str, body_html: str) -> bool:
+    """Retorna True se o email tem >= 1 publicacao."""
+    if subject and _SUBJECT_ZERO_PUB.search(subject):
+        return False
+    if "Não foi localizada qualquer publicação" in (body_html or ""):
+        return False
+    return True
+
+
+async def check_gmail_oab_es():
+    """Busca emails UNSEEN com label OAB-ES e processa.
+
+    Fluxo:
+      1. IMAP fetch de novos emails
+      2. Salva cru em emails_recebidos (auditoria)
+      3. Se tem publicacoes (Public. N. com N >= 1):
+         - Parse com email_parser
+         - Para cada intimacao: dedup, INSERT, notify Telegram, AI summary
+    """
+    if not settings.gmail_user or not settings.gmail_app_password:
+        logger.info("check_gmail_oab_es: credenciais Gmail nao configuradas (pulando)")
+        return 0
+
+    from app.services.gmail_imap import fetch_oab_es_emails
+
+    loop = asyncio.get_event_loop()
+    try:
+        emails = await loop.run_in_executor(None, fetch_oab_es_emails, True, 50)
+    except Exception as e:
+        logger.error(f"check_gmail_oab_es: erro ao buscar emails: {e}")
+        return 0
+
+    if not emails:
+        return 0
+
+    saved = 0
+    intimacoes_total = 0
+    for email in emails:
+        try:
+            mid = email.get("message_id") or ""
+            subject = email.get("subject") or ""
+            body_html = email.get("html") or ""
+            body_text = email.get("text") or ""
+
+            # Dedup por message_id
+            if mid:
+                existing = supabase.table("emails_recebidos").select("id").eq(
+                    "message_id", mid
+                ).limit(1).execute()
+                if existing.data:
+                    continue
+
+            # Salva cru
+            ins = supabase.table("emails_recebidos").insert({
+                "from_addr": (email.get("from") or "")[:255],
+                "subject": subject[:500],
+                "body_html": body_html,
+                "body_text": body_text,
+                "received_at_source": email.get("date") or "",
+                "message_id": mid[:255],
+                "imap_uid": (email.get("uid") or "")[:64],
+                "processed": False,
+            }).execute()
+            saved += 1
+            email_db_id = ins.data[0]["id"] if ins.data else None
+
+            # Se nao tem publicacoes, marca processed=true e segue
+            if not _has_publications(subject, body_html):
+                if email_db_id:
+                    supabase.table("emails_recebidos").update({
+                        "processed": True,
+                        "intimacoes_count": 0,
+                    }).eq("id", email_db_id).execute()
+                continue
+
+            # Tem publicacoes — processa
+            if email_db_id and settings.oab_es_enabled:
+                count = await process_email_to_intimacoes(email_db_id, body_html, body_text, subject)
+                intimacoes_total += count
+
+        except Exception as e:
+            logger.error(f"check_gmail_oab_es: erro ao processar email {email.get('uid')}: {e}", exc_info=True)
+
+    logger.info(f"check_gmail_oab_es: {saved} email(s) salvos, {intimacoes_total} intimacao(oes) criada(s)")
+    return saved
+
+
+async def process_email_to_intimacoes(email_db_id: str, body_html: str, body_text: str, subject: str) -> int:
+    """Processa 1 email_recebido em intimacoes. Retorna qtd criadas.
+
+    - Parse com email_parser.parse_oab_es_email
+    - Para cada intimacao:
+        - Hash dedup (mesma logica que AASP)
+        - get_or_create processo
+        - INSERT em intimacoes
+        - notify_nova_intimacao
+        - summarize_intimacao (Groq)
+    - Atualiza emails_recebidos com processed=true / parse_error
+    """
+    from app.services.email_parser import parse_oab_es_email
+
+    try:
+        intimacoes_parsed = parse_oab_es_email(body_html, body_text, subject)
+    except Exception as e:
+        logger.error(f"process_email_to_intimacoes: parser falhou: {e}", exc_info=True)
+        supabase.table("emails_recebidos").update({
+            "parse_error": str(e)[:500],
+        }).eq("id", email_db_id).execute()
+        return 0
+
+    if not intimacoes_parsed:
+        supabase.table("emails_recebidos").update({
+            "processed": True,
+            "intimacoes_count": 0,
+            "parse_error": "Subject indica >0 publicacoes mas parser nao extraiu nenhuma",
+        }).eq("id", email_db_id).execute()
+        return 0
+
+    # ── Batch dedup por hash ──
+    hashes = []
+    for item in intimacoes_parsed:
+        h = generate_hash(item.get("conteudo", ""), item.get("data_disponibilizacao", ""))
+        hashes.append(h)
+
+    existing_resp = supabase.table("intimacoes").select("hash_conteudo").in_(
+        "hash_conteudo", hashes
+    ).execute()
+    existing_set = {r["hash_conteudo"] for r in (existing_resp.data or [])}
+
+    created = 0
+    for item, h in zip(intimacoes_parsed, hashes):
+        if h in existing_set:
+            continue
+
+        numero = item.get("numero_processo") or ""
+        conteudo = item.get("conteudo", "")
+        data_disp_str = item.get("data_disponibilizacao", "")
+
+        # ── get_or_create processo ──
+        processo_id = None
+        if numero:
+            try:
+                proc_resp = supabase.table("processos").select("id").eq("numero", numero).limit(1).execute()
+                if proc_resp.data:
+                    processo_id = proc_resp.data[0]["id"]
+                else:
+                    novo = supabase.table("processos").insert({
+                        "numero": numero,
+                        "vara": item.get("vara") or None,
+                        "comarca": item.get("comarca") or None,
+                        "partes": item.get("partes") or {"autor": [], "reu": []},
+                        "assunto": (item.get("titulo") or "")[:200] or None,
+                    }).execute()
+                    if novo.data:
+                        processo_id = novo.data[0]["id"]
+                        logger.info(f"process_email: criado processo novo {numero}")
+            except Exception as e:
+                logger.error(f"process_email: erro processo {numero}: {e}")
+
+        # ── INSERT intimacao ──
+        try:
+            intim_data = {
+                "processo_id": processo_id,
+                "data_disponibilizacao": data_disp_str or None,
+                "data_publicacao": item.get("data_publicacao") or None,
+                "conteudo": conteudo,
+                "diario_oficial": item.get("diario_oficial") or None,
+                "caderno": item.get("caderno") or None,
+                "pagina": int(item["pagina"]) if (item.get("pagina") or "").isdigit() else None,
+                "hash_conteudo": h,
+                "lida": False,
+            }
+            ins = supabase.table("intimacoes").insert(intim_data).execute()
+            if not ins.data:
+                continue
+            db_intim_id = ins.data[0]["id"]
+            created += 1
+
+            # ── Notify Telegram ──
+            try:
+                data_disp_obj = date.fromisoformat(data_disp_str) if data_disp_str else date.today()
+            except Exception:
+                data_disp_obj = date.today()
+
+            await notify_nova_intimacao(
+                {"processo": numero, "conteudo": conteudo, "diario": item.get("diario_oficial")},
+                data_disp_obj,
+                db_intim_id,
+            )
+
+            # ── AI summary (Groq) ──
+            if settings.groq_api_key:
+                try:
+                    resumo = await summarize_intimacao(conteudo)
+                    if resumo:
+                        await bot.app.bot.send_message(
+                            chat_id=settings.telegram_chat_id,
+                            text=f"🤖 <b>Resumo IA:</b>\n{resumo}",
+                            parse_mode="HTML",
+                        )
+                except Exception as e:
+                    logger.error(f"process_email: groq summary erro: {e}")
+
+            await asyncio.sleep(1)
+        except Exception as e:
+            logger.error(f"process_email: erro insert intimacao: {e}", exc_info=True)
+
+    # ── Marca email como processado ──
+    supabase.table("emails_recebidos").update({
+        "processed": True,
+        "intimacoes_count": created,
+    }).eq("id", email_db_id).execute()
+
+    return created
