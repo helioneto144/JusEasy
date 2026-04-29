@@ -281,3 +281,59 @@ async def resumo_diario(force: bool = False):
             text += f"Existem {urgentes} prazos extremamente urgentes (/prazos).\n"
 
     await bot.send_message(text, parse_mode="HTML")
+
+
+# ─────────────────────────────────────────────
+# Gmail IMAP — captura de emails OAB-ES (Fase 1: só salva crus)
+# ─────────────────────────────────────────────
+
+async def check_gmail_oab_es():
+    """Busca emails UNSEEN com label OAB-ES no Gmail e salva em emails_recebidos.
+
+    Fase 1: salva apenas o email cru (HTML, texto, headers). Sem parsing.
+    Fase 2/3 (futuro): processa o conteudo e cria intimacoes.
+    """
+    if not settings.gmail_user or not settings.gmail_app_password:
+        logger.info("check_gmail_oab_es: credenciais Gmail nao configuradas (pulando)")
+        return 0
+
+    from app.services.gmail_imap import fetch_oab_es_emails
+
+    loop = asyncio.get_event_loop()
+    try:
+        emails = await loop.run_in_executor(None, fetch_oab_es_emails, True, 50)
+    except Exception as e:
+        logger.error(f"check_gmail_oab_es: erro ao buscar emails: {e}")
+        return 0
+
+    if not emails:
+        return 0
+
+    saved = 0
+    for email in emails:
+        try:
+            # Dedup leve por message_id (evita inserir 2x se algo falhar entre IMAP e DB)
+            mid = email.get("message_id") or ""
+            if mid:
+                existing = supabase.table("emails_recebidos").select("id").eq(
+                    "message_id", mid
+                ).limit(1).execute()
+                if existing.data:
+                    continue
+
+            supabase.table("emails_recebidos").insert({
+                "from_addr": (email.get("from") or "")[:255],
+                "subject": (email.get("subject") or "")[:500],
+                "body_html": email.get("html") or "",
+                "body_text": email.get("text") or "",
+                "received_at_source": email.get("date") or "",
+                "message_id": mid[:255],
+                "imap_uid": (email.get("uid") or "")[:64],
+                "processed": False,
+            }).execute()
+            saved += 1
+        except Exception as e:
+            logger.error(f"check_gmail_oab_es: erro ao salvar email {email.get('uid')}: {e}")
+
+    logger.info(f"check_gmail_oab_es: {saved} email(s) novo(s) salvos")
+    return saved

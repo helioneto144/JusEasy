@@ -49,6 +49,14 @@ async def lifespan(app: FastAPI):
         id="resumo_diario",
         name="Resumo diário"
     )
+    # OAB-ES envia de manha — checar 1x/h das 7h as 12h.
+    # Refinar pro horario exato depois de observar quando chegam os emails.
+    scheduler.add_job(
+        run_check_gmail_oab_es,
+        CronTrigger(hour="7-12", minute="0", timezone=tz),
+        id="check_gmail_oab_es",
+        name="Coletar emails OAB-ES via Gmail IMAP"
+    )
     scheduler.start()
     logger.info(f"Scheduler started with timezone {tz}")
 
@@ -100,6 +108,19 @@ def run_resumo_diario():
         logger.error(f"Job: resumo_diario erro: {e}")
 
 
+def run_check_gmail_oab_es():
+    from app.scheduler.jobs import check_gmail_oab_es
+    logger.info("Job: check_gmail_oab_es iniciado")
+    if not event_loop:
+        logger.error("Job: check_gmail_oab_es - event_loop nao disponivel")
+        return
+    try:
+        count = asyncio.run_coroutine_threadsafe(check_gmail_oab_es(), event_loop).result(timeout=60)
+        logger.info(f"Job: check_gmail_oab_es concluido — {count} email(s)")
+    except Exception as e:
+        logger.error(f"Job: check_gmail_oab_es erro: {e}")
+
+
 app = FastAPI(
     title="JusEasy - Gestão de Processos",
     description="Sistema pessoal de gestão de prazos e processos jurídicos",
@@ -130,6 +151,21 @@ async def trigger_check():
     from app.scheduler.jobs import check_intimacoes
     await check_intimacoes()
     return {"status": "checked"}
+
+
+@app.post("/api/check-gmail")
+async def trigger_gmail_check():
+    """Dispara manualmente a coleta de emails OAB-ES (debug/teste)."""
+    from app.scheduler.jobs import check_gmail_oab_es
+    count = await check_gmail_oab_es()
+    return {"status": "checked", "emails_novos": count}
+
+
+@app.get("/api/gmail-test")
+async def gmail_smoke_test():
+    """Testa conexao IMAP com Gmail (sem ler emails)."""
+    from app.services.gmail_imap import test_connection
+    return test_connection()
 
 
 if __name__ == "__main__":

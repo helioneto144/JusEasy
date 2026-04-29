@@ -13,3 +13,5 @@ pyyaml>=6.0.1
 jinja2>=3.1.2
 python-multipart>=0.0.6
 openai>=1.0.0
+imap-tools>=1.5.0
+beautifulsoup4>=4.12.0
