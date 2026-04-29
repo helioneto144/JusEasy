@@ -49,11 +49,11 @@ async def lifespan(app: FastAPI):
         id="resumo_diario",
         name="Resumo diário"
     )
-    # OAB-ES envia de manha — checar 1x/h das 7h as 12h.
-    # Refinar pro horario exato depois de observar quando chegam os emails.
+    # OAB-ES envia entre 02h-03h America/Sao_Paulo (validado em emails reais).
+    # Rodamos as 04h, 07h e 10h pra pegar o do dia + fallback.
     scheduler.add_job(
         run_check_gmail_oab_es,
-        CronTrigger(hour="7-12", minute="0", timezone=tz),
+        CronTrigger(hour="4,7,10", minute="0", timezone=tz),
         id="check_gmail_oab_es",
         name="Coletar emails OAB-ES via Gmail IMAP"
     )

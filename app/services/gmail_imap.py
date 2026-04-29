@@ -32,7 +32,7 @@ def fetch_oab_es_emails(mark_seen: bool = True, limit: int = 50) -> List[Dict]:
         with MailBox(settings.gmail_imap_host).login(
             settings.gmail_user,
             settings.gmail_app_password,
-            initial_folder=f'"{settings.gmail_imap_label}"' if settings.gmail_imap_label else "INBOX"
+            initial_folder=settings.gmail_imap_label or "INBOX"
         ) as mailbox:
             messages = mailbox.fetch(AND(seen=False), limit=limit, mark_seen=mark_seen)
             for msg in messages:
