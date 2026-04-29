@@ -55,6 +55,42 @@ def fetch_oab_es_emails(mark_seen: bool = True, limit: int = 50) -> List[Dict]:
     return emails
 
 
+def fetch_by_subject(subject_contains: str, mark_seen: bool = False, limit: int = 50) -> List[Dict]:
+    """Busca emails na label OAB-ES por trecho do subject (independente de seen).
+
+    Util pra trazer amostras de emails ja lidos que tem 'Public. 1.' ou similar.
+    NAO marca como lido por padrao (preserva estado original).
+    """
+    if not settings.gmail_user or not settings.gmail_app_password:
+        return []
+    from imap_tools import H
+
+    emails = []
+    try:
+        with MailBox(settings.gmail_imap_host).login(
+            settings.gmail_user,
+            settings.gmail_app_password,
+            initial_folder=settings.gmail_imap_label or "INBOX"
+        ) as mailbox:
+            criteria = AND(subject=subject_contains)
+            messages = mailbox.fetch(criteria, limit=limit, mark_seen=mark_seen)
+            for msg in messages:
+                emails.append({
+                    "from": msg.from_ or "",
+                    "subject": msg.subject or "",
+                    "html": msg.html or "",
+                    "text": msg.text or "",
+                    "date": msg.date.isoformat() if msg.date else "",
+                    "uid": msg.uid or "",
+                    "message_id": msg.headers.get("message-id", [""])[0] if msg.headers else "",
+                })
+        logger.info(f"gmail_imap.fetch_by_subject('{subject_contains}'): {len(emails)} email(s)")
+    except Exception as e:
+        logger.error(f"gmail_imap.fetch_by_subject erro: {e}")
+
+    return emails
+
+
 def test_connection() -> dict:
     """Smoke test — usado pelo healthcheck/troubleshoot."""
     if not settings.gmail_user or not settings.gmail_app_password:
