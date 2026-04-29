@@ -5,32 +5,48 @@
 ![Telegram](https://img.shields.io/badge/Telegram-Bot-26A5E4?logo=telegram)
 ![License](https://img.shields.io/badge/Licença-MIT-green)
 
-Sistema pessoal de gestão de processos jurídicos com **bot no Telegram**, **dashboard web** e **inteligência artificial** integrada. Desenvolvido para advogados brasileiros que desejam centralizar intimações (AASP), prazos e tarefas em um único lugar.
+Sistema pessoal de gestão de processos jurídicos com **bot no Telegram**, **dashboard web** e **inteligência artificial** integrada. Desenvolvido para advogados brasileiros que desejam centralizar intimações, prazos e tarefas em um único lugar.
+
+---
+
+## ⚠️ Aviso de migração — AASP API → Gmail OAB-ES
+
+> **A v1 do JusEasy usava a API da AASP** para puxar intimações. Essa API foi descontinuada / não está mais disponível para todos os associados. A versão atual (v2) **substituiu essa fonte por leitura direta do Gmail** usando IMAP, pegando emails do **Recorte Digital da OAB** (testado com OAB-ES, mas o parser é genérico para o template Webjur Brasil).
+
+**Se você precisa do código antigo que usa AASP**, consulte a branch [`old-AASP`](https://github.com/helioneto144/JusEasy/tree/old-AASP). Ela está congelada e não recebe atualizações.
+
+| | v1 (`old-AASP`) | v2 (atual `main`) |
+|---|---|---|
+| Fonte de intimações | API da AASP | Gmail IMAP (label "OAB-ES") |
+| Pré-requisito | Associado AASP/SP com chave de API | Conta Gmail + 2FA + App Password |
+| Frequência | Cron 3x/dia (8h, 12h, 16h) | Cron 3x/dia (4h, 7h, 10h — refinável) |
+| Custo | Anuidade AASP | Zero |
+
+Tudo o mais (banco, IA, Telegram, dashboard) continua igual.
 
 ---
 
 ## ✨ Funcionalidades
 
-- **🔔 Monitoramento automático de intimações** — Consulta a API da AASP (8h, 12h, 16h) e notifica no Telegram assim que uma nova intimação é detectada
-- **🤖 Resumo IA de intimações** — Ao receber uma nova intimação, a IA (Groq) resume o conteúdo e informa qual ação tomar
+- **🔔 Captura automática de intimações via email** — JusEasy acessa seu Gmail via IMAP, lê emails da OAB com label "OAB-ES", parseia o HTML do Recorte Digital (Webjur Brasil) e cria intimações no banco
+- **🤖 Resumo IA de intimações** — A IA (Groq) resume cada intimação nova e sugere ação
 - **📅 Alertas de prazos** — Notifica prazos dos próximos 3 dias antes que vençam
 - **📋 Resumo diário inteligente** — Envia resumo pela manhã somente se houver tarefas, intimações não lidas ou urgências
-- **📁 Gestão de processos** — Cadastre, edite e arquive processos com número CNJ
+- **📁 Gestão de processos** — Cadastre, edite e arquive processos com número CNJ; auto-criação de processo quando uma intimação chega para um número novo
 - **📝 Tarefas e prazos** — Crie tarefas com prioridade, tipo e data de vencimento
 - **🧠 Consulta jurídica com IA** — Use o comando `/ia` para tirar dúvidas com contexto do processo
-- **🌐 Dashboard web** — Interface moderna com Tailwind CSS, acessível via navegador
+- **🌐 Dashboard web** — Interface moderna com Tailwind CSS, acessível via navegador, responsiva mobile
 
 ---
 
 ## 📋 Pré-requisitos
 
-Antes de instalar, você precisará criar contas nos seguintes serviços:
-
 | Serviço | Obrigatório | Finalidade | Custo |
 |---------|-------------|------------|-------|
 | [Supabase](https://supabase.com) | ✅ | Banco de dados PostgreSQL | Gratuito |
 | [Telegram @BotFather](https://t.me/BotFather) | ✅ | Criar o bot | Gratuito |
-| [AASP](https://www.aasp.org.br) | ✅ | Intimações do diário oficial | Associado AASP |
+| Conta **Gmail com 2FA** | ✅ | Recebe os emails do Recorte Digital + App Password para IMAP | Gratuito |
+| Cadastro no Recorte Digital da sua **OAB Estadual** | ✅ | Recebe as intimações por email | Anuidade OAB |
 | [Groq](https://console.groq.com) | ⭐ Recomendado | IA para resumos e consultas | Gratuito |
 | [Docker](https://docs.docker.com/get-docker/) | ✅ | Deploy da aplicação | Gratuito |
 
@@ -65,6 +81,7 @@ create table processos (
   partes jsonb default '{"autor": [], "reu": []}',
   valor_causa numeric(15,2),
   data_distribuicao date,
+  status text default 'em_andamento',
   arquivado boolean default false,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
@@ -100,6 +117,34 @@ create table tarefas (
   notificado boolean default false,
   created_at timestamptz default now()
 );
+
+-- Tabela de notas (anotações livres em processos)
+create table notas (
+  id uuid primary key default gen_random_uuid(),
+  processo_id uuid references processos(id) on delete cascade,
+  conteudo text not null,
+  created_at timestamptz default now()
+);
+
+-- Tabela de emails recebidos (auditoria + buffer pra parser)
+create table emails_recebidos (
+  id uuid primary key default gen_random_uuid(),
+  from_addr text,
+  subject text,
+  body_html text,
+  body_text text,
+  message_id text,
+  imap_uid text,
+  received_at_source text,
+  processed boolean default false,
+  parse_error text,
+  intimacoes_count integer default 0,
+  received_at timestamptz default now()
+);
+create unique index idx_emails_recebidos_message_id
+    on emails_recebidos(message_id) where message_id <> '';
+create index idx_emails_recebidos_processed
+    on emails_recebidos(processed) where processed = false;
 ```
 
 3. Em **Project Settings > API**, copie:
@@ -122,7 +167,29 @@ create table tarefas (
 
 ---
 
-### Passo 4 — Obter chave da Groq (IA)
+### Passo 4 — Configurar o Gmail (App Password) ⭐ NOVO
+
+> Esse passo substitui a chave AASP da v1.
+
+1. **Ativar 2FA** em https://myaccount.google.com/security (necessário para gerar App Password)
+2. Acesse https://myaccount.google.com/apppasswords
+3. App: `Mail` · Device: `Other` → digite `JusEasy`
+4. Copie a senha de **16 caracteres** gerada (ex: `abcd efgh ijkl mnop`) — **remova os espaços** ao colar no `.env`
+
+5. **Criar filtro Gmail** para aplicar a label `OAB-ES` aos emails do Recorte Digital:
+   - Gmail → Settings (engrenagem) → **See all settings** → **Filters and Blocked Addresses** → **Create a new filter**
+   - **From**: o remetente do Recorte Digital da sua OAB Estadual.
+     Exemplo OAB-ES: `oabes@recortedigital.adv.br`
+   - Clique em **Create filter**
+   - ☑ **Apply the label**: criar nova label `OAB-ES`
+   - ☑ **Also apply filter to matching conversations** (para pegar emails antigos também)
+   - Salvar
+
+> O parser foi testado com o Recorte Digital da OAB-ES (template Webjur Brasil). Outras OABs estaduais que usem o mesmo serviço (Webjur Brasil) devem funcionar sem mudanças. Se sua OAB usa template diferente, será necessário ajustar `app/services/email_parser.py`.
+
+---
+
+### Passo 5 — Obter chave da Groq (IA)
 
 1. Acesse [console.groq.com](https://console.groq.com) e crie uma conta gratuita
 2. Vá em **API Keys** e crie uma nova chave
@@ -132,29 +199,31 @@ create table tarefas (
 
 ---
 
-### Passo 5 — Obter chave da AASP
-
-1. Acesse o portal da [AASP](https://www.aasp.org.br) com sua conta de associado
-2. Localize a seção de **Intimações Eletrônicas / API**
-3. Gere ou copie sua chave de API → `AASP_API_KEY`
-
----
-
 ### Passo 6 — Configurar o `.env`
 
-Edite o arquivo `.env` com todas as credenciais obtidas nos passos anteriores:
+Edite o arquivo `.env` com todas as credenciais obtidas:
 
 ```env
+# Supabase
 SUPABASE_URL=https://seu-projeto.supabase.co
 SUPABASE_ANON_KEY=sua-anon-key
 DATABASE_URL=postgresql://postgres.seu-projeto:senha@host:6543/postgres
 
-AASP_API_KEY=sua-chave-aasp
-AASP_API_URL=https://intimacaoapi.aasp.org.br
+# Gmail IMAP (substitui AASP)
+GMAIL_USER=seu-email@gmail.com
+GMAIL_APP_PASSWORD=abcdefghijklmnop
+GMAIL_IMAP_HOST=imap.gmail.com
+GMAIL_IMAP_LABEL=OAB-ES
 
+# Feature flags
+AASP_ENABLED=false        # mantenha false se não tem chave AASP
+OAB_ES_ENABLED=true       # ativa o pipeline de processamento
+
+# Telegram
 TELEGRAM_BOT_TOKEN=1234567890:AAExxxxxxxxxxxxxxxx
 TELEGRAM_CHAT_ID=123456789
 
+# IA (Groq)
 GROQ_API_KEY=gsk_xxxxxxxxxxxxxxxx
 GROQ_BASE_URL=https://api.groq.com/openai/v1
 GROQ_MODEL=llama-3.3-70b-versatile
@@ -163,10 +232,12 @@ AI_API_KEY=gsk_xxxxxxxxxxxxxxxx
 AI_BASE_URL=https://api.groq.com/openai/v1
 AI_MODEL=llama-3.3-70b-versatile
 
-POLLING_INTERVAL_HOURS=3
+# Geral
 TIMEZONE=America/Sao_Paulo
 APP_URL=http://SEU-IP-OU-DOMINIO:8000
 ```
+
+> **Sobre AASP**: se você ainda tem chave AASP e quer usar paralelo (improvável), preencha `AASP_API_KEY` e `AASP_ENABLED=true`. O hash de deduplicação garante que não duplica intimações entre as duas fontes.
 
 ---
 
@@ -176,12 +247,39 @@ APP_URL=http://SEU-IP-OU-DOMINIO:8000
 docker compose up -d --build
 ```
 
-Acesse o dashboard em: **http://localhost:8000** (ou o IP do seu servidor)
+Acesse o dashboard em **http://localhost:8000** (ou o IP do seu servidor).
 
 Para ver os logs:
 ```bash
 docker logs oracle --tail 50 -f
 ```
+
+---
+
+### Passo 8 — Validar o pipeline de email
+
+Endpoints administrativos para testar:
+
+```bash
+# 1. Testar conexão IMAP (sem ler emails)
+curl http://localhost:8000/api/gmail-test
+# Esperado: {"ok":true,"label_existe":true,...}
+
+# 2. Disparar coleta manual (lê UNSEEN com label OAB-ES, processa, notifica Telegram)
+curl -X POST http://localhost:8000/api/check-gmail
+# Esperado: {"status":"checked","emails_novos":N}
+
+# 3. Reprocessar emails já no banco (debug)
+curl -X POST http://localhost:8000/api/admin/reprocess-emails
+
+# 4. Buscar emails antigos por subject (admin)
+curl -X POST "http://localhost:8000/api/admin/gmail-fetch-by-subject?subject=Public.%201."
+```
+
+Após receber pelo menos 1 email com `Public. 1.` (ou maior) no subject:
+- Você recebe **notificação Telegram** com o trecho da intimação + botões interativos
+- Você recebe **resumo IA** (Groq) em até 3 linhas
+- A intimação aparece no dashboard `/intimacoes` e fica vinculada ao processo (auto-criado se for número CNJ novo)
 
 ---
 
@@ -191,17 +289,21 @@ docker logs oracle --tail 50 -f
 |---------|-----------|
 | `/start` | Menu principal com todos os comandos |
 | `/status` | Resumo: processos, intimações não lidas, tarefas urgentes |
+| `/stats` | Estatísticas detalhadas (ativos/arquivados, concluídas semana) |
 | `/resumo` | Dispara o resumo diário manualmente |
 | `/intimacoes` | Lista as últimas intimações não lidas |
 | `/processos` | Lista os processos cadastrados |
-| `/processo NUMERO` | Detalhes de um processo específico (ex: `/processo 1234567-00.2024.8.26.0100`) |
+| `/processo NUMERO` | Detalhes de um processo (ex: `/processo 1234567-00.2024.8.26.0100`) |
 | `/tarefas` | Lista tarefas pendentes |
 | `/prazos` | Tarefas agrupadas por urgência |
 | `/hoje` | Tarefas com vencimento hoje |
 | `/semana` | Tarefas para os próximos 7 dias |
-| `/tarefa TITULO\|DATA\|TIPO\|PRIORIDADE` | Cria uma tarefa (ex: `/tarefa Contestação\|2025-05-10\|prazo\|urgente`) |
-| `/ia [NUMERO] PERGUNTA` | Consulta jurídica com IA (ex: `/ia 1234567-00.2024.8.26.0100 Qual o prazo para recurso?`) |
-| `/yaml NUMERO` | Exporta o processo em YAML para análise |
+| `/calendario` | Visão semanal: tarefas + intimações por dia |
+| `/tarefa TITULO\|DATA\|TIPO\|PRIORIDADE` | Cria tarefa (ex: `/tarefa Contestação\|2025-05-10\|prazo\|urgente`) |
+| `/nota NUMERO TEXTO` | Adiciona anotação a um processo |
+| `/busca TERMO` | Busca em processos, intimações e tarefas |
+| `/ia [NUMERO] PERGUNTA` | Consulta jurídica com IA (ex: `/ia 1234... Qual o prazo para recurso?`) |
+| `/yaml NUMERO` | Exporta o processo em YAML para análise externa |
 
 ### Tipos de tarefa válidos
 `prazo` · `audiencia` · `peticao` · `recurso`
@@ -213,12 +315,14 @@ docker logs oracle --tail 50 -f
 
 ## 🌐 Dashboard Web
 
-Acesse `http://SEU-IP:8000` para usar a interface web:
+Interface responsiva (mobile + desktop) com sidebar colapsável:
 
-- **Dashboard** — visão geral com contadores e últimas intimações
-- **Processos** — lista, busca, criação e arquivamento de processos
-- **Intimações** — listagem com filtro por lidas/não lidas
-- **Tarefas** — lista com botão de conclusão e exclusão
+- **Dashboard** — visão geral, contadores, mini-calendário semanal, próximos prazos
+- **Processos** — lista com filtros, busca, status (em andamento, audiência marcada, recurso, etc)
+- **Detalhes do Processo** — timeline cronológica de intimações + tarefas + notas, dropdown de status, edição inline
+- **Intimações** — listagem com filtro lidas/não lidas, paginação
+- **Tarefas** — Kanban por prioridade + tabela completa, conclusão e exclusão
+- **Busca global** (Cmd+K na sidebar) — pesquisa em processos, intimações e tarefas
 
 ---
 
@@ -229,14 +333,20 @@ Acesse `http://SEU-IP:8000` para usar a interface web:
 | `SUPABASE_URL` | ✅ | URL do projeto Supabase |
 | `SUPABASE_ANON_KEY` | ✅ | Chave anon do Supabase |
 | `DATABASE_URL` | ✅ | Connection string PostgreSQL |
-| `AASP_API_KEY` | ✅ | Chave da API de intimações AASP |
+| `GMAIL_USER` | ✅ | Email Gmail que recebe os emails da OAB |
+| `GMAIL_APP_PASSWORD` | ✅ | App Password de 16 chars (sem espaços) |
+| `GMAIL_IMAP_LABEL` | — | Label do filtro Gmail (padrão: `OAB-ES`) |
+| `OAB_ES_ENABLED` | ✅ | `true` para ativar o pipeline de email |
+| `AASP_ENABLED` | — | `true` se você ainda tem chave AASP (legado) |
+| `AASP_API_KEY` | — | Chave AASP (só se `AASP_ENABLED=true`) |
 | `TELEGRAM_BOT_TOKEN` | ✅ | Token do bot criado no @BotFather |
 | `TELEGRAM_CHAT_ID` | ✅ | ID do chat que receberá as notificações |
 | `GROQ_API_KEY` | ⭐ | Chave Groq para resumos de intimações |
 | `AI_API_KEY` | ⭐ | Chave para o comando /ia (pode ser a mesma Groq) |
 | `APP_URL` | — | URL pública da aplicação (padrão: `http://localhost:8000`) |
 | `TIMEZONE` | — | Fuso horário (padrão: `America/Sao_Paulo`) |
-| `POLLING_INTERVAL_HOURS` | — | Intervalo de verificação em horas (padrão: `3`) |
+
+Mais detalhes do setup IMAP em [`docs/oab-es-email.md`](docs/oab-es-email.md).
 
 ---
 
@@ -245,10 +355,19 @@ Acesse `http://SEU-IP:8000` para usar a interface web:
 - **Backend:** FastAPI + Python 3.11
 - **Banco de dados:** Supabase (PostgreSQL)
 - **Bot Telegram:** python-telegram-bot v21
-- **Agendamento:** APScheduler
+- **Agendamento:** APScheduler (CronTrigger 4h/7h/10h America/Sao_Paulo)
+- **IMAP:** imap-tools (login via App Password)
+- **Parser HTML:** BeautifulSoup4 (template Webjur Brasil OAB-ES)
 - **IA:** Groq (llama-3.3-70b-versatile)
-- **Frontend:** Tailwind CSS + HTMX + Alpine.js
+- **Frontend:** Tailwind CSS + HTMX + Alpine.js (responsivo)
 - **Deploy:** Docker + Docker Compose
+
+---
+
+## 🌳 Estrutura de branches
+
+- **`main`** — versão atual (Gmail IMAP / OAB-ES). Recebe novos commits.
+- **`old-AASP`** — versão antiga que usa a API da AASP. Congelada, não recebe atualizações. Use se ainda tem acesso à API e prefere essa fonte.
 
 ---
 
